@@ -56,7 +56,7 @@ func TestOneLayerPathHandlerDoesNotMatchSubstrings(t *testing.T) {
 				server.OneLayerPathHandlerFunc(c)
 			})
 			require.Equal(t, http.StatusBadRequest, recorder.Code)
-			require.Contains(t, recorder.Body.String(), "OPTIONAL_QUERY_PARAM_INCORRECT")
+			require.Contains(t, recorder.Body.String(), "Supi is invalid")
 		})
 	}
 }
@@ -261,6 +261,49 @@ func TestHandleGetTraceDataRejectsMalformedPlmnID(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	require.Equal(t, "application/problem+json", recorder.Header().Get("Content-Type"))
 	require.Contains(t, recorder.Body.String(), "OPTIONAL_QUERY_PARAM_INCORRECT")
+}
+
+func TestSDMHandlersRejectInvalidSupiBeforeProcessor(t *testing.T) {
+	const invalidSupi = "imsi-222770000000001\x00INJECTED"
+
+	tests := []struct {
+		name    string
+		handler func(*Server, *gin.Context)
+	}{
+		{name: "smf-select-data", handler: func(s *Server, c *gin.Context) {
+			s.HandleGetSmfSelectData(c)
+		}},
+		{name: "supi", handler: func(s *Server, c *gin.Context) {
+			s.HandleGetSupi(c)
+		}},
+		{name: "trace-data", handler: func(s *Server, c *gin.Context) {
+			s.HandleGetTraceData(c)
+		}},
+		{name: "ue-context-in-smf-data", handler: func(s *Server, c *gin.Context) {
+			s.HandleGetUeContextInSmfData(c)
+		}},
+		{name: "nssai", handler: func(s *Server, c *gin.Context) {
+			s.HandleGetNssai(c)
+		}},
+		{name: "sm-data", handler: func(s *Server, c *gin.Context) {
+			s.HandleGetSmData(c)
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder, c := newSDMTestContext(t, http.MethodGet, "/test", "")
+			c.Params = gin.Params{{Key: "supi", Value: invalidSupi}}
+
+			server := &Server{}
+			tt.handler(server, c)
+
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			require.Equal(t, "application/problem+json", recorder.Header().Get("Content-Type"))
+			require.Contains(t, recorder.Body.String(), "Supi is invalid")
+			require.NotContains(t, recorder.Body.String(), "SYSTEM_FAILURE")
+		})
+	}
 }
 
 func TestDeserializationErrorsAreSanitized(t *testing.T) {

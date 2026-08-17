@@ -36,17 +36,8 @@ func (s *Server) HandleGetAmData(c *gin.Context) {
 
 	// TS 29.503 6.1.3.5.2
 	// Validate SUPI format
-	supi := c.Params.ByName("supi")
-	if !validator.IsValidSupi(supi) {
-		problemDetail := models.ProblemDetails{
-			Title:  "Malformed request syntax",
-			Status: http.StatusBadRequest,
-			Detail: "Supi is invalid",
-			Cause:  "MANDATORY_IE_INCORRECT",
-		}
-		logger.SdmLog.Warnln("Supi is invalid")
-		c.Set(sbi.IN_PB_DETAILS_CTX_STR, http.StatusText(int(problemDetail.Status)))
-		c.JSON(int(problemDetail.Status), problemDetail)
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
 		return
 	}
 
@@ -66,6 +57,25 @@ func (s *Server) HandleGetAmData(c *gin.Context) {
 	supportedFeatures := query.Get("supported-features")
 
 	s.Processor().GetAmDataProcedure(c, supi, plmnID, supportedFeatures)
+}
+
+func (s *Server) getValidatedSupi(c *gin.Context) (string, bool) {
+	supi := c.Params.ByName("supi")
+	if validator.IsValidSupi(supi) {
+		return supi, true
+	}
+
+	problemDetail := models.ProblemDetails{
+		Title:  "Malformed request syntax",
+		Status: http.StatusBadRequest,
+		Detail: "Supi is invalid",
+		Cause:  "MANDATORY_IE_INCORRECT",
+	}
+	logger.SdmLog.Warnln("Supi is invalid")
+	c.Set(sbi.IN_PB_DETAILS_CTX_STR, http.StatusText(int(problemDetail.Status)))
+	c.Header("Content-Type", "application/problem+json")
+	c.JSON(int(problemDetail.Status), problemDetail)
+	return "", false
 }
 
 func (s *Server) getPlmnIDStruct(
@@ -140,7 +150,10 @@ func (s *Server) HandleGetSmfSelectData(c *gin.Context) {
 
 	logger.SdmLog.Infof("Handle GetSmfSelectData")
 
-	supi := c.Params.ByName("supi")
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
+		return
+	}
 	// use c.Request.URL.Query() only for getPlmnIDStruct
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
 	if problemDetails != nil {
@@ -177,7 +190,10 @@ func (s *Server) HandleGetSupi(c *gin.Context) {
 
 	logger.SdmLog.Infof("Handle GetSupiRequest")
 
-	supi := c.Params.ByName("supi")
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
+		return
+	}
 	// use c.Request.URL.Query() only for getPlmnIDStruct
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
 	if problemDetails != nil {
@@ -421,7 +437,10 @@ func (s *Server) HandleModifyForSharedData(c *gin.Context) {
 func (s *Server) HandleGetTraceData(c *gin.Context) {
 	logger.SdmLog.Infof("Handle GetTraceData")
 
-	supi := c.Params.ByName("supi")
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
+		return
+	}
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
 	if problemDetails != nil {
 		c.Set(sbi.IN_PB_DETAILS_CTX_STR, problemDetails.Cause)
@@ -442,7 +461,10 @@ func (s *Server) HandleGetTraceData(c *gin.Context) {
 func (s *Server) HandleGetUeContextInSmfData(c *gin.Context) {
 	logger.SdmLog.Infof("Handle GetUeContextInSmfData")
 
-	supi := c.Params.ByName("supi")
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
+		return
+	}
 	supportedFeatures := c.Query("supported-features")
 
 	s.Processor().GetUeContextInSmfDataProcedure(c, supi, supportedFeatures)
@@ -461,7 +483,10 @@ func (s *Server) HandleGetNssai(c *gin.Context) {
 
 	logger.SdmLog.Infof("Handle GetNssai")
 
-	supi := c.Params.ByName("supi")
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
+		return
+	}
 	// use c.Request.URL.Query() only for getPlmnIDStruct
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
 	if problemDetails != nil {
@@ -489,7 +514,10 @@ func (s *Server) HandleGetSmData(c *gin.Context) {
 
 	logger.SdmLog.Infof("Handle GetSmData")
 
-	supi := c.Params.ByName("supi")
+	supi, valid := s.getValidatedSupi(c)
+	if !valid {
+		return
+	}
 	// use c.Request.URL.Query() only for getPlmnIDStruct
 	plmnIDStruct, problemDetails := s.getPlmnIDStruct(c.Request.URL.Query())
 	if problemDetails != nil {
